@@ -34,3 +34,48 @@ flutter pub get
 
 # 2. 앱 실행 (에뮬레이터 또는 실기기)
 flutter run
+
+---
+
+## 🧩 1일차 (2025.10.28) 진행 요약  
+**🎯 목표:** Flutter + Android Studio + Emulator + VSCode 환경 세팅 완료  
+
+- Flutter SDK 설치 및 환경 변수 설정  
+- Android Studio 설치 및 SDK Tools 구성  
+- Android Emulator 실행 및 테스트 (Pixel 6 → Pixel 4 대체 성공)  
+- Flutter Demo App 빌드 및 실행 확인 (Flutter Demo Home Page)  
+- VSCode와 Flutter 프로젝트 연동 완료  
+
+✅ **결과:** 개발 환경 완전 구축 (Flutter 앱 실행 가능 상태)  
+
+---
+
+## 🧩 2일차 (2025.10.29) 진행 요약  
+**🎯 목표:** Firebase 프로젝트 생성 및 Flutter 연동  
+
+- Firebase Console에서 MediCheck 프로젝트 생성  
+- Flutter 프로젝트에 Firebase 연결 (firebase_options.dart 생성 완료)  
+- pubspec.yaml에 Firebase SDK 추가  
+  - firebase_core: ^3.3.0  
+  - cloud_firestore: ^5.4.0  
+- VSCode에서 Firebase 초기화 코드 삽입 및 실행 확인  
+- Android Emulator에서 “Firebase Connected Successfully” 문구 출력  
+- GitHub 저장소(MOK-YH/MediCheck) 생성 및 초기 커밋 완료  
+
+✅ **결과:** Firebase 연동 및 GitHub 리포지토리 설정 완료  
+
+---
+
+## 🧩 3일차 (2025.10.30) 진행 요약  
+**🎯 목표:** MediCheck UI 프로토타입 완성 및 GitHub 버전 관리  
+
+- Flutter + Firebase Core 연동 완료  
+- MediCheck 홈 화면(HomeScreen) 제작  
+- 복약 알림 화면(AlarmScreen) 제작  
+- 홈 → 알림 화면 전환 기능 구현  
+- GitHub 업로드 및 커밋 완료  
+
+✅ **결과:** MediCheck 앱 프로토타입 완성 (시연 가능한 단계)  
+
+---
+
