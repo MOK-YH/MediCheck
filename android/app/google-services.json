@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "166582404431",
+    "project_id": "medicheck-157f1",
+    "storage_bucket": "medicheck-157f1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:166582404431:android:691050f86462a46709b13a",
+        "android_client_info": {
+          "package_name": "com.example.medi_check"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBOMqEtPO6H_abi-085BOaL1vmO5kOvvTs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:166582404431:android:4478bbba3f04355209b13a",
+        "android_client_info": {
+          "package_name": "com.mok.medicheck"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBOMqEtPO6H_abi-085BOaL1vmO5kOvvTs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
