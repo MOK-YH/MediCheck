@@ -23,7 +23,7 @@ Firebase를 기반으로 한 실시간 데이터 동기화와 알림 기능을 �
 | Frontend | Flutter (Dart) |
 | Backend | Firebase (Firestore, Authentication, Hosting) |
 | Tools | VSCode, Android Studio, GitHub |
-| OS | Android / iOS (iPhone SE2 테스트 예정) |
+| OS | Android / iOS (테스트 예정) |
 
 ---
 
