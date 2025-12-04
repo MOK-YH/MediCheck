@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'register_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -64,6 +65,13 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  void _goToForgotPassword() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -124,6 +132,17 @@ class _LoginScreenState extends State<LoginScreen> {
                         style: TextStyle(fontSize: 16, color: Colors.white),
                       ),
                     ),
+            ),
+
+            const SizedBox(height: 10),
+
+            // 비밀번호 재설정 이동
+            TextButton(
+              onPressed: _goToForgotPassword,
+              child: const Text(
+                '비밀번호를 잊으셨나요?',
+                style: TextStyle(color: Colors.grey, fontSize: 14),
+              ),
             ),
 
             const SizedBox(height: 20),
