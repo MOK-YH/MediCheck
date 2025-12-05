@@ -17,22 +17,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   DateTime _focusedDay = DateTime.now();
   DateTime _selectedDay = DateTime.now();
-
-  Map<String, dynamic>? _todaySchedule; // Firestore에서 불러온 일정 저장용
+  Map<String, dynamic>? _selectedSchedule;
 
   @override
   void initState() {
     super.initState();
-    _loadTodaySchedule();
+    _loadSchedule(_selectedDay);
   }
 
-  Future<void> _loadTodaySchedule() async {
+  Future<void> _loadSchedule(DateTime date) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
 
-    final dateId =
-        "${_focusedDay.year}-${_focusedDay.month}-${_focusedDay.day}";
-
+    final dateId = "${date.year}-${date.month}-${date.day}";
     final doc = await _firestore
         .collection('users')
         .doc(uid)
@@ -40,24 +37,38 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         .doc(dateId)
         .get();
 
-    if (doc.exists) {
-      setState(() {
-        _todaySchedule = doc.data();
-      });
-    } else {
-      setState(() {
-        _todaySchedule = null;
-      });
-    }
+    setState(() {
+      _selectedSchedule = doc.exists ? doc.data() : null;
+    });
   }
 
   void _onDaySelected(DateTime selectedDay, DateTime focusedDay) async {
     setState(() {
       _selectedDay = selectedDay;
       _focusedDay = focusedDay;
-      _todaySchedule = null; // 초기화 후 다시 로드
+      _selectedSchedule = null;
     });
-    await _loadTodaySchedule();
+    await _loadSchedule(selectedDay);
+  }
+
+  void _createNewSchedule() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+    final dateId = "${_selectedDay.year}-${_selectedDay.month}-${_selectedDay.day}";
+
+    // 기본 템플릿 일정 생성
+    await _firestore
+        .collection('users')
+        .doc(uid)
+        .collection('schedules')
+        .doc(dateId)
+        .set({
+      "morning": {"time": "미설정", "name": "", "taken": false},
+      "lunch": {"time": "미설정", "name": "", "taken": false},
+      "dinner": {"time": "미설정", "name": "", "taken": false},
+    });
+
+    await _loadSchedule(_selectedDay);
   }
 
   @override
@@ -73,12 +84,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       body: Column(
         children: [
           const SizedBox(height: 10),
-          // 🗓 달력 전체 보기
           TableCalendar(
             focusedDay: _focusedDay,
             firstDay: DateTime(2020),
             lastDay: DateTime(2030),
-            calendarFormat: CalendarFormat.month, // ✅ 한 달 보기로 확대
+            calendarFormat: CalendarFormat.month,
             selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
             onDaySelected: _onDaySelected,
             headerStyle: const HeaderStyle(
@@ -86,26 +96,36 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               titleCentered: true,
             ),
           ),
-
           const SizedBox(height: 10),
           Text(
             "선택된 날짜: $dateText",
             style: const TextStyle(
                 fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
           ),
-
           const SizedBox(height: 10),
-
-          // 🗒 오늘 일정 카드
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: _todaySchedule == null
+              child: _selectedSchedule == null
                   ? Center(
-                      child: Text(
-                        "등록된 일정이 없습니다.",
-                        style: TextStyle(
-                            fontSize: 16, color: Colors.grey.shade600),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text("등록된 일정이 없습니다.",
+                              style: TextStyle(
+                                  fontSize: 16, color: Colors.grey.shade600)),
+                          const SizedBox(height: 15),
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.add),
+                            label: const Text("새 일정 추가"),
+                            onPressed: _createNewSchedule,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blueAccent,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 24, vertical: 12),
+                            ),
+                          ),
+                        ],
                       ),
                     )
                   : Card(
@@ -118,14 +138,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              "🗓 오늘 일정",
+                              "📅 선택된 날짜 일정",
                               style: TextStyle(
                                   fontSize: 18, fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 10),
-                            _buildScheduleRow("아침", _todaySchedule?['morning']),
-                            _buildScheduleRow("점심", _todaySchedule?['lunch']),
-                            _buildScheduleRow("저녁", _todaySchedule?['dinner']),
+                            _buildScheduleRow("아침", _selectedSchedule?['morning']),
+                            _buildScheduleRow("점심", _selectedSchedule?['lunch']),
+                            _buildScheduleRow("저녁", _selectedSchedule?['dinner']),
                             const Spacer(),
                             Center(
                               child: ElevatedButton.icon(
@@ -146,7 +166,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                       builder: (_) =>
                                           DayDetailScreen(selectedDay: _selectedDay),
                                     ),
-                                  ).then((_) => _loadTodaySchedule());
+                                  ).then((_) => _loadSchedule(_selectedDay));
                                 },
                               ),
                             ),
