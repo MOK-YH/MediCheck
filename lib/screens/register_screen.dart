@@ -11,11 +11,9 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  // Firebase 인스턴스
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // 입력 필드 컨트롤러
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
@@ -25,7 +23,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool _isLoading = false;
 
-  // 회원가입 함수
   Future<void> _registerUser() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
@@ -34,7 +31,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final diagnosis = _diagnosisController.text.trim();
     final guardian = _guardianController.text.trim();
 
-    // 입력값 검증
     if (email.isEmpty ||
         password.isEmpty ||
         name.isEmpty ||
@@ -50,16 +46,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 1️⃣ Firebase Authentication: 이메일로 회원 생성
+      print("🟢 Firebase Auth 회원가입 시도");
       UserCredential userCredential =
           await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      final uid = userCredential.user!.uid;
+      final uid = userCredential.user?.uid;
+      if (uid == null) {
+        print("❌ UID를 가져오지 못했습니다.");
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('UID를 가져올 수 없습니다.')),
+        );
+        return;
+      }
 
-      // 2️⃣ Firestore에 사용자 정보 저장
+      print("✅ Auth 완료, UID: $uid");
+      print("🟢 Firestore 저장 시도 중...");
+
       await _firestore.collection('users').doc(uid).set({
         'email': email,
         'name': name,
@@ -68,21 +73,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
         'guardian': guardian,
         'created_at': FieldValue.serverTimestamp(),
         'provider': 'email',
-      });
+      }, SetOptions(merge: true));
 
+      print("✅ Firestore 저장 완료!");
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('회원가입 완료!')),
+        const SnackBar(content: Text('회원가입 및 Firestore 저장 완료!')),
       );
 
-      // 🔹 입력창 초기화
       _emailController.clear();
       _passwordController.clear();
       _nameController.clear();
       _birthController.clear();
       _diagnosisController.clear();
       _guardianController.clear();
-
-      // 🔹 자동으로 홈화면으로 전환은 main.dart의 AuthWrapper에서 처리됨
     } on FirebaseAuthException catch (e) {
       String message = '회원가입 실패';
       if (e.code == 'email-already-in-use') {
@@ -90,30 +93,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
       } else if (e.code == 'weak-password') {
         message = '비밀번호가 너무 짧습니다.';
       }
+      print('⚠️ FirebaseAuth 오류: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
       );
-    } catch (e) {
+    } catch (e, stacktrace) {
+      print('🔥 Firestore 저장 오류: $e');
+      print(stacktrace);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('오류 발생: $e')),
+        SnackBar(content: Text('Firestore 오류 발생: $e')),
       );
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
-// ✅ 추가: Google 로그인 함수
   Future<void> _signInWithGoogle() async {
     try {
-      // 1️⃣ 구글 로그인 창 열기
+      print("🟢 Google 로그인 시도");
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) return; // 사용자가 로그인 취소한 경우
+      if (googleUser == null) {
+        print("⚠️ Google 로그인 취소됨");
+        return;
+      }
 
-      // 2️⃣ 인증 정보 가져오기
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
 
-      // 3️⃣ Firebase Auth로 로그인 처리
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
@@ -121,11 +127,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final userCredential =
           await FirebaseAuth.instance.signInWithCredential(credential);
 
-      // 4️⃣ Firestore에 사용자 정보 없으면 새로 저장
       final uid = userCredential.user!.uid;
       final userDoc = _firestore.collection('users').doc(uid);
-
       final snapshot = await userDoc.get();
+
       if (!snapshot.exists) {
         await userDoc.set({
           'email': userCredential.user!.email,
@@ -136,12 +141,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
           'provider': 'google',
           'created_at': FieldValue.serverTimestamp(),
         });
+        print("✅ Google 계정 Firestore 저장 완료!");
+      } else {
+        print("ℹ️ Google 계정 Firestore 문서 이미 존재");
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Google 로그인 성공!')),
       );
     } catch (e) {
+      print('🔥 Google 로그인 실패: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Google 로그인 실패: $e')),
       );
@@ -165,7 +174,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             const SizedBox(height: 20),
 
-            // 이메일
             TextField(
               controller: _emailController,
               decoration: const InputDecoration(
@@ -176,7 +184,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             const SizedBox(height: 15),
 
-            // 비밀번호
             TextField(
               controller: _passwordController,
               decoration: const InputDecoration(
@@ -187,7 +194,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             const SizedBox(height: 15),
 
-            // 이름
             TextField(
               controller: _nameController,
               decoration: const InputDecoration(
@@ -197,7 +203,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             const SizedBox(height: 15),
 
-            // 생년월일
             TextField(
               controller: _birthController,
               decoration: const InputDecoration(
@@ -207,7 +212,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             const SizedBox(height: 15),
 
-            // 질병명
             TextField(
               controller: _diagnosisController,
               decoration: const InputDecoration(
@@ -217,7 +221,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             const SizedBox(height: 15),
 
-            // 보호자
             TextField(
               controller: _guardianController,
               decoration: const InputDecoration(
@@ -227,7 +230,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             const SizedBox(height: 25),
 
-            // 등록 버튼
             Center(
               child: _isLoading
                   ? const CircularProgressIndicator()
@@ -247,10 +249,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
             ),
-
             const SizedBox(height: 30),
 
-            // 🔴 Google 로그인 버튼
             Center(
               child: SizedBox(
                 width: 250,
@@ -277,7 +277,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ],
         ),
-      ),  
+      ),
     );
   }
 }
