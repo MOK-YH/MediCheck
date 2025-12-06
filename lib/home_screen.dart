@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'alarm_screen.dart';
+import 'services/schedule_sync_service.dart'; // ✅ 추가
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,6 +18,9 @@ class _HomeScreenState extends State<HomeScreen> {
   final _firestore = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
 
+  // ✅ 동기화 서비스 인스턴스 추가
+  final ScheduleSyncService _syncService = ScheduleSyncService();
+
   DateTime _selectedDate = DateTime.now();
   Map<String, dynamic>? _scheduleData;
 
@@ -23,8 +28,17 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     initializeDateFormatting('ko_KR', null).then((_) {
-      _loadSchedule();
+      _loadSchedule();                   // 일정 불러오기
+      _syncService.startListening();     // ✅ Firestore 실시간 감시 시작
+      _syncService.scheduleDailyFullSync(); // ✅ 00시 자동 전송
     });
+  }
+
+  /// ✅ 앱 종료 시 리스너 해제
+  @override
+  void dispose() {
+    _syncService.dispose();
+    super.dispose();
   }
 
   /// 🔹 선택된 날짜 기준 Firestore 일정 불러오기
