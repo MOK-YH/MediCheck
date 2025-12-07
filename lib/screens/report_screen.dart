@@ -16,8 +16,8 @@ class _ReportScreenState extends State<ReportScreen> {
   final _auth = FirebaseAuth.instance;
 
   DateTime _selectedWeek = DateTime.now();
-  Map<String, double> _weeklyCounts = {};   // 🔥 요일별 '횟수' 저장
-  double _averageRate = 0.0;                // 🔥 평균 복약률 (%)
+  Map<String, double> _weeklyCounts = {};   // 🔥 요일별 복용 "횟수"
+  double _averageRate = 0.0;                // 🔥 평균 복용률 (%)
 
   @override
   void initState() {
@@ -25,13 +25,13 @@ class _ReportScreenState extends State<ReportScreen> {
     _loadWeeklyData();
   }
 
-  /// 주차 계산
+  /// 특정 날짜의 주차 계산
   int weekOfMonth(DateTime date) {
     int firstDay = DateTime(date.year, date.month, 1).weekday;
     return ((date.day + firstDay - 1) / 7).ceil();
   }
 
-  /// Firestore에서 해당 주차 데이터 로드
+  /// Firestore에서 주간 데이터 로드
   Future<void> _loadWeeklyData() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
@@ -62,19 +62,24 @@ class _ReportScreenState extends State<ReportScreen> {
         int taken = 0;
         int total = 0;
 
+        // ⭐ 홈 화면과 동일한 로직으로 복용 횟수 계산
         for (var meal in ['morning', 'lunch', 'dinner']) {
-          if (data[meal]['time'] != '미설정' && data[meal]['name'] != '') {
+          var mealData = data[meal];
+
+          if (mealData != null && mealData['time'] != '미설정') {
             total++;
-            if (data[meal]['taken'] == true) taken++;
+            if (mealData['taken'] == true) taken++;
           }
         }
 
-        // 🔥 그래프는 "횟수" 저장
+        // ⭐ 그래프에는 복용 "횟수"
         tempCounts[weekday] = taken.toDouble();
 
-        // 🔥 평균은 기존대로 "복용률"로 계산
-        totalRate += total > 0 ? taken / total : 0;
-        if (total > 0) validDays++;
+        // ⭐ 평균 복용률은 "복용률"로 계산
+        if (total > 0) {
+          totalRate += taken / total;
+          validDays++;
+        }
       } else {
         tempCounts[weekday] = 0;
       }
@@ -104,7 +109,7 @@ class _ReportScreenState extends State<ReportScreen> {
   Widget build(BuildContext context) {
     List<String> weekDaysOrder = ['월', '화', '수', '목', '금', '토', '일'];
 
-    // 🔥 요일 순서대로 횟수 배열 생성
+    // ⭐ 요일 순서대로 복용 횟수 넣기
     List<double> chartValues = weekDaysOrder.map((d) {
       return _weeklyCounts[d] ?? 0.0;
     }).toList();
@@ -118,7 +123,7 @@ class _ReportScreenState extends State<ReportScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // 🔹 주차 표시
+            // 🔹 주차 네비게이션
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -158,8 +163,7 @@ class _ReportScreenState extends State<ReportScreen> {
               child: BarChart(
                 BarChartData(
                   alignment: BarChartAlignment.spaceAround,
-                  gridData:
-                      FlGridData(show: true, drawVerticalLine: false),
+                  gridData: FlGridData(show: true, drawVerticalLine: false),
                   titlesData: FlTitlesData(
                     leftTitles: const AxisTitles(
                         sideTitles: SideTitles(showTitles: false)),
@@ -177,7 +181,7 @@ class _ReportScreenState extends State<ReportScreen> {
                     ),
                   ),
 
-                  // 🔥 그래프에 '횟수' 그대로 표시
+                  // ⭐ 횟수 기준 그래프
                   barGroups: List.generate(7, (i) {
                     return BarChartGroupData(
                       x: i,
@@ -195,6 +199,8 @@ class _ReportScreenState extends State<ReportScreen> {
             ),
 
             const Divider(height: 30, thickness: 1),
+
+            // AI 분석 문구
             const Align(
               alignment: Alignment.centerLeft,
               child: Text('💬 AI 복약 습관 분석',
