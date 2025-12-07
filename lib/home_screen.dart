@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'alarm_screen.dart';
 import 'services/schedule_sync_service.dart';
-import 'webview_screen.dart';  // ⭐ 추가됨: WebView 연결
+import 'webview_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -172,8 +172,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             children: List.generate(3, (i) {
                               bool filled = i < takenCount;
                               return Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 4),
+                                  padding:
+                                      const EdgeInsets.symmetric(horizontal: 4),
                                   child: Icon(Icons.medication_rounded,
                                       color: filled
                                           ? Colors.blue
@@ -205,6 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final isPast = _selectedDate.isBefore(now);
 
     DateTime? scheduledTime;
+
     if (time != '미설정' && time.isNotEmpty) {
       try {
         final parsed = DateFormat('h:mm a').parseLoose(time);
@@ -217,28 +218,21 @@ class _HomeScreenState extends State<HomeScreen> {
       } catch (_) {}
     }
 
-    bool isAfterTime =
-        isToday && scheduledTime != null && now.isAfter(scheduledTime);
+    // ✔ 복용 시간 기준 ±30분 윈도우 체크
+    bool allowRealtime = false;
+    if (scheduledTime != null && isToday) {
+      final windowStart =
+          scheduledTime.subtract(const Duration(minutes: 30));
+      final windowEnd =
+          scheduledTime.add(const Duration(minutes: 30));
 
-    String buttonText = '';
-    Color buttonColor = Colors.grey;
-    bool enabled = false;
-
-    if (isFuture) {
-      buttonText = '미래 일정';
-    } else if (isPast && !isToday) {
-      buttonText = '지난 일정';
-    } else if (isToday && !isAfterTime) {
-      buttonText = '시간 전';
-    } else if (taken) {
-      buttonText = '다시 확인';
-      buttonColor = Colors.green;
-      enabled = true;
-    } else {
-      buttonText = '복용 확인';
-      buttonColor = Colors.blue;
-      enabled = true;
+      if (now.isAfter(windowStart) && now.isBefore(windowEnd)) {
+        allowRealtime = true;
+      }
     }
+
+    // ✔ 복용 확인 가능 조건
+    bool canCheck = !isFuture && (isToday ? now.isAfter(scheduledTime ?? now) : !isToday);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -252,6 +246,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -271,35 +266,51 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
 
-          // ---------------------------
-          // 🔥 여기만 기능 추가됨
-          // ---------------------------
-          ElevatedButton.icon(
-            onPressed: enabled
-                ? () async {
-                    await _markAsTaken(period);
+          // ✔ 버튼 2개 (실시간 확인 + 복용 확인)
+          Column(
+            children: [
+              // ⭐ 실시간 확인 버튼
+              ElevatedButton.icon(
+                onPressed: allowRealtime
+                    ? () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const WebViewScreen(
+                              url: "http://100.72.23.91:8000/stream.mjpg",
+                            ),
+                          ),
+                        );
+                      }
+                    : null,
+                icon: const Icon(Icons.camera_alt, size: 16),
+                label: const Text("실시간 확인"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor:
+                      allowRealtime ? Colors.blue : Colors.grey,
+                  minimumSize: const Size(120, 40),
+                ),
+              ),
 
-                    // ⭐ WebViewScreen으로 이동
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const WebViewScreen(
-                          url: "http://100.72.23.91:8000/stream.mjpg",
-                        ),
-                      ),
-                    );
-                  }
-                : null,
-            icon: const Icon(Icons.camera_alt, size: 18),
-            label: Text(buttonText, style: const TextStyle(fontSize: 15)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: buttonColor,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              minimumSize: const Size(115, 46),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
+              const SizedBox(height: 6),
+
+              // ⭐ 복용 확인 버튼
+              ElevatedButton(
+                onPressed: canCheck
+                    ? () async {
+                        await _markAsTaken(period);
+                      }
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: taken ? Colors.green : Colors.orange,
+                  minimumSize: const Size(120, 40),
+                ),
+                child: Text(
+                  taken ? '다시 확인' : '복용 확인',
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
           ),
         ],
       ),
