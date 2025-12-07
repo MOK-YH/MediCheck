@@ -16,8 +16,8 @@ class _ReportScreenState extends State<ReportScreen> {
   final _auth = FirebaseAuth.instance;
 
   DateTime _selectedWeek = DateTime.now();
-  Map<String, double> _weeklyRates = {};
-  double _averageRate = 0.0;
+  Map<String, double> _weeklyCounts = {};   // 🔥 요일별 '횟수' 저장
+  double _averageRate = 0.0;                // 🔥 평균 복약률 (%)
 
   @override
   void initState() {
@@ -25,28 +25,28 @@ class _ReportScreenState extends State<ReportScreen> {
     _loadWeeklyData();
   }
 
-  /// 주차 계산 함수 (1주차, 2주차 등)
+  /// 주차 계산
   int weekOfMonth(DateTime date) {
     int firstDay = DateTime(date.year, date.month, 1).weekday;
     return ((date.day + firstDay - 1) / 7).ceil();
   }
 
-  /// Firestore에서 해당 주차의 데이터 로드
+  /// Firestore에서 해당 주차 데이터 로드
   Future<void> _loadWeeklyData() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
 
+    // 월요일 기준 주간 날짜 생성
     DateTime monday =
         _selectedWeek.subtract(Duration(days: _selectedWeek.weekday - 1));
     List<DateTime> weekDays =
         List.generate(7, (i) => monday.add(Duration(days: i)));
 
-    Map<String, double> rates = {};
+    Map<String, double> tempCounts = {};
     double totalRate = 0;
     int validDays = 0;
 
     for (var day in weekDays) {
-      // 문서 ID는 "2025-12-5" 형식으로 저장되어야 함
       String dateId = "${day.year}-${day.month}-${day.day}";
       final doc = await _firestore
           .collection('users')
@@ -63,24 +63,25 @@ class _ReportScreenState extends State<ReportScreen> {
         int total = 0;
 
         for (var meal in ['morning', 'lunch', 'dinner']) {
-          // 약이 설정된 경우만 total에 포함
           if (data[meal]['time'] != '미설정' && data[meal]['name'] != '') {
             total++;
             if (data[meal]['taken'] == true) taken++;
           }
         }
 
-        double rate = total > 0 ? taken / total : 0;
-        rates[weekday] = rate;
-        totalRate += rate;
-        validDays++;
+        // 🔥 그래프는 "횟수" 저장
+        tempCounts[weekday] = taken.toDouble();
+
+        // 🔥 평균은 기존대로 "복용률"로 계산
+        totalRate += total > 0 ? taken / total : 0;
+        if (total > 0) validDays++;
       } else {
-        rates[weekday] = 0;
+        tempCounts[weekday] = 0;
       }
     }
 
     setState(() {
-      _weeklyRates = rates;
+      _weeklyCounts = tempCounts;
       _averageRate = validDays > 0 ? (totalRate / validDays) * 100 : 0;
     });
   }
@@ -102,8 +103,10 @@ class _ReportScreenState extends State<ReportScreen> {
   @override
   Widget build(BuildContext context) {
     List<String> weekDaysOrder = ['월', '화', '수', '목', '금', '토', '일'];
+
+    // 🔥 요일 순서대로 횟수 배열 생성
     List<double> chartValues = weekDaysOrder.map((d) {
-      return _weeklyRates[d] ?? 0.0;
+      return _weeklyCounts[d] ?? 0.0;
     }).toList();
 
     return Scaffold(
@@ -115,7 +118,7 @@ class _ReportScreenState extends State<ReportScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // 🔹 주차 표시 (이전/다음 주 이동)
+            // 🔹 주차 표시
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -132,9 +135,10 @@ class _ReportScreenState extends State<ReportScreen> {
                     icon: const Icon(Icons.arrow_right)),
               ],
             ),
+
             const SizedBox(height: 10),
 
-            // 🔹 타이틀
+            // 🔹 주간 평균 복용률
             Row(
               children: const [
                 Icon(Icons.calendar_today, color: Colors.red),
@@ -146,8 +150,7 @@ class _ReportScreenState extends State<ReportScreen> {
             ),
             const SizedBox(height: 8),
             Text("${_averageRate.toStringAsFixed(1)}%",
-                style:
-                    const TextStyle(fontSize: 28, color: Colors.blue)),
+                style: const TextStyle(fontSize: 28, color: Colors.blue)),
             const SizedBox(height: 20),
 
             // 🔹 막대그래프
@@ -173,14 +176,17 @@ class _ReportScreenState extends State<ReportScreen> {
                       ),
                     ),
                   ),
+
+                  // 🔥 그래프에 '횟수' 그대로 표시
                   barGroups: List.generate(7, (i) {
                     return BarChartGroupData(
                       x: i,
                       barRods: [
                         BarChartRodData(
-                            toY: chartValues[i] * 3,
-                            color: Colors.blue,
-                            width: 18),
+                          toY: chartValues[i],
+                          color: Colors.blue,
+                          width: 18,
+                        ),
                       ],
                     );
                   }),
