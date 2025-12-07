@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -23,7 +22,6 @@ class _DayDetailScreenState extends State<DayDetailScreen> {
   TimeOfDay? _lunchTime;
   TimeOfDay? _dinnerTime;
 
-  // ✅ 페이지 진입 시 Firestore에서 기존 데이터 불러오기
   @override
   void initState() {
     super.initState();
@@ -47,16 +45,10 @@ class _DayDetailScreenState extends State<DayDetailScreen> {
     if (docSnap.exists) {
       final data = docSnap.data()!;
       setState(() {
-        // 시간 값 불러오기
-        final morningTimeStr = data['morning']?['time'];
-        final lunchTimeStr = data['lunch']?['time'];
-        final dinnerTimeStr = data['dinner']?['time'];
+        _morningTime = _parseTime(data['morning']?['time']);
+        _lunchTime = _parseTime(data['lunch']?['time']);
+        _dinnerTime = _parseTime(data['dinner']?['time']);
 
-        _morningTime = _parseTime(morningTimeStr);
-        _lunchTime = _parseTime(lunchTimeStr);
-        _dinnerTime = _parseTime(dinnerTimeStr);
-
-        // 약 종류 불러오기
         _morningController.text = data['morning']?['name'] ?? '';
         _lunchController.text = data['lunch']?['name'] ?? '';
         _dinnerController.text = data['dinner']?['name'] ?? '';
@@ -64,96 +56,144 @@ class _DayDetailScreenState extends State<DayDetailScreen> {
     }
   }
 
-  // ✅ "8:30 AM" 같은 문자열을 TimeOfDay로 변환하는 헬퍼
   TimeOfDay? _parseTime(String? timeStr) {
     if (timeStr == null || timeStr == '미설정') return null;
     try {
-      final format = TimeOfDayFormat.h_colon_mm_space_a;
-      final time = TimeOfDay(
-        hour: int.parse(timeStr.split(':')[0]),
-        minute: int.parse(timeStr.split(':')[1].split(' ')[0]),
-      );
-      return time;
+      final parts = timeStr.split(" ");
+      final hm = parts[0].split(":");
+      int hour = int.parse(hm[0]);
+      int minute = int.parse(hm[1]);
+
+      if (parts[1] == "PM" && hour != 12) hour += 12;
+      if (parts[1] == "AM" && hour == 12) hour = 0;
+
+      return TimeOfDay(hour: hour, minute: minute);
     } catch (_) {
       return null;
     }
   }
 
   Future<void> _pickTime(String period) async {
-    TimeOfDay? selected;
+    final hourController = TextEditingController();
+    final minuteController = TextEditingController(text: "00");
+    String ampm = "AM";
+
+    TimeOfDay? current;
+    if (period == 'morning') current = _morningTime;
+    if (period == 'lunch') current = _lunchTime;
+    if (period == 'dinner') current = _dinnerTime;
+
+    if (current != null) {
+      int displayHour = current.hour % 12;
+      if (displayHour == 0) displayHour = 12;
+      hourController.text = displayHour.toString();
+      minuteController.text = current.minute.toString().padLeft(2, "0");
+      ampm = current.hour >= 12 ? "PM" : "AM";
+    }
+
     await showModalBottomSheet(
       context: context,
-      builder: (context) {
-        int selectedHour = 8;
-        int selectedMinute = 0;
-        bool isUnset = false;
-
-        return StatefulBuilder(builder: (context, setModalState) {
-          return Container(
-            height: 250,
-            color: Colors.white,
+      isScrollControlled: true,
+      builder: (_) {
+        return Padding(
+          padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom, top: 20),
+          child: Container(
+            padding: const EdgeInsets.all(20),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SizedBox(height: 10),
-                const Text('시간 선택', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Expanded(
-                  child: CupertinoPicker(
-                    scrollController: FixedExtentScrollController(initialItem: 8),
-                    itemExtent: 40,
-                    onSelectedItemChanged: (index) {
-                      if (index == 0) {
-                        setModalState(() => isUnset = true);
-                      } else {
-                        setModalState(() {
-                          isUnset = false;
-                          selectedHour = (index - 1) ~/ 2;
-                          selectedMinute = ((index - 1) % 2) * 30;
-                        });
-                      }
-                    },
-                    children: [
-                      const Center(child: Text('미설정')),
-                      for (int h = 0; h < 24; h++)
-                        for (int m in [0, 30])
-                          Center(child: Text('${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}')),
-                    ],
-                  ),
+                const Text("시간 입력",
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 15),
+
+                // 입력 UI
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    SizedBox(
+                      width: 70,
+                      child: TextField(
+                        controller: hourController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: "시"),
+                      ),
+                    ),
+                    const Text(":", style: TextStyle(fontSize: 22)),
+                    SizedBox(
+                      width: 70,
+                      child: TextField(
+                        controller: minuteController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: "분"),
+                      ),
+                    ),
+                    DropdownButton<String>(
+                      value: ampm,
+                      items: const [
+                        DropdownMenuItem(value: "AM", child: Text("AM")),
+                        DropdownMenuItem(value: "PM", child: Text("PM")),
+                      ],
+                      onChanged: (v) {
+                        setState(() => ampm = v!);
+                      },
+                    ),
+                  ],
                 ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    if (!isUnset) {
-                      selected = TimeOfDay(hour: selectedHour, minute: selectedMinute);
+                const SizedBox(height: 20),
+
+                Center(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      int h = int.tryParse(hourController.text) ?? 0;
+                      int m = int.tryParse(minuteController.text) ?? 0;
+
+                      if (h < 1 || h > 12 || m < 0 || m > 59) {
+                        Navigator.pop(context);
+                        return;
+                      }
+
+                      if (ampm == "PM" && h != 12) h += 12;
+                      if (ampm == "AM" && h == 12) h = 0;
+
+                      TimeOfDay selected = TimeOfDay(hour: h, minute: m);
+
                       setState(() {
                         if (period == 'morning') _morningTime = selected;
                         if (period == 'lunch') _lunchTime = selected;
                         if (period == 'dinner') _dinnerTime = selected;
                       });
-                    } else {
-                      setState(() {
-                        if (period == 'morning') _morningTime = null;
-                        if (period == 'lunch') _lunchTime = null;
-                        if (period == 'dinner') _dinnerTime = null;
-                      });
-                    }
-                  },
-                  child: const Text('확인', style: TextStyle(color: Colors.blue, fontSize: 16)),
+
+                      Navigator.pop(context);
+                    },
+                    child: const Text("확인"),
+                  ),
                 ),
+                const SizedBox(height: 10),
               ],
             ),
-          );
-        });
+          ),
+        );
       },
     );
   }
 
-  // ✅ 병합 저장 적용 (기존 데이터 유지)
   Future<void> _saveSchedule() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
 
     final dateId =
         "${widget.selectedDay.year}-${widget.selectedDay.month}-${widget.selectedDay.day}";
+
+    String format(TimeOfDay? t) {
+      if (t == null) return "미설정";
+      final hour = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
+      final minute = t.minute.toString().padLeft(2, '0');
+      final ampm = t.period == DayPeriod.am ? "AM" : "PM";
+      return "$hour:$minute $ampm";
+    }
 
     await _firestore
         .collection('users')
@@ -162,19 +202,19 @@ class _DayDetailScreenState extends State<DayDetailScreen> {
         .doc(dateId)
         .set({
       'morning': {
-        'time': _morningTime == null ? '미설정' : _morningTime!.format(context),
+        'time': format(_morningTime),
         'name': _morningController.text.trim(),
       },
       'lunch': {
-        'time': _lunchTime == null ? '미설정' : _lunchTime!.format(context),
+        'time': format(_lunchTime),
         'name': _lunchController.text.trim(),
       },
       'dinner': {
-        'time': _dinnerTime == null ? '미설정' : _dinnerTime!.format(context),
+        'time': format(_dinnerTime),
         'name': _dinnerController.text.trim(),
       },
       'updated_at': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true)); // ✅ 기존 데이터와 병합
+    }, SetOptions(merge: true));
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('일정이 저장되었습니다.')),
@@ -185,6 +225,7 @@ class _DayDetailScreenState extends State<DayDetailScreen> {
   Widget build(BuildContext context) {
     final dateId =
         "${widget.selectedDay.year}-${widget.selectedDay.month}-${widget.selectedDay.day}";
+
     return Scaffold(
       appBar: AppBar(
         title: Text('세부 일정 - $dateId'),
@@ -193,10 +234,8 @@ class _DayDetailScreenState extends State<DayDetailScreen> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          const Text(
-            '복용 시간과 약 종류를 등록하세요',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
+          const Text('복용 시간과 약 종류를 등록하세요',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 20),
 
           _buildTimeBlock('아침', 'morning', _morningTime, _morningController),
@@ -204,16 +243,18 @@ class _DayDetailScreenState extends State<DayDetailScreen> {
           _buildTimeBlock('점심', 'lunch', _lunchTime, _lunchController),
           const Divider(),
           _buildTimeBlock('저녁', 'dinner', _dinnerTime, _dinnerController),
-
           const SizedBox(height: 30),
+
           Center(
             child: ElevatedButton(
               onPressed: _saveSchedule,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blue,
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
               ),
-              child: const Text('저장하기', style: TextStyle(fontSize: 16, color: Colors.white)),
+              child: const Text('저장하기',
+                  style: TextStyle(fontSize: 16, color: Colors.white)),
             ),
           ),
         ],
@@ -221,17 +262,19 @@ class _DayDetailScreenState extends State<DayDetailScreen> {
     );
   }
 
-  Widget _buildTimeBlock(String title, String key, TimeOfDay? time, TextEditingController controller) {
+  Widget _buildTimeBlock(String title, String key, TimeOfDay? time,
+      TextEditingController controller) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+        Text(title,
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         Row(
           children: [
             Expanded(
               child: Text(
-                time == null ? '미설정' : time.format(context),
+                time == null ? '미설정' : _formatDisplayTime(time),
                 style: const TextStyle(fontSize: 16),
               ),
             ),
@@ -252,5 +295,12 @@ class _DayDetailScreenState extends State<DayDetailScreen> {
         ),
       ],
     );
+  }
+
+  String _formatDisplayTime(TimeOfDay t) {
+    final h = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
+    final m = t.minute.toString().padLeft(2, "0");
+    final ap = t.period == DayPeriod.am ? "AM" : "PM";
+    return "$h:$m $ap";
   }
 }

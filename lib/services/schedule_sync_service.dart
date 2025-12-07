@@ -11,6 +11,18 @@ class ScheduleSyncService {
   final List<StreamSubscription> _listeners = []; // ✅ 여러 문서 리스너 관리
   bool _initialSyncDone = false;
 
+  /// ⭐ 날짜 포맷(YYYY-M-D → YYYY-MM-DD) 변환 함수 추가
+  String _formatDateId(String id) {
+    final parts = id.split('-');
+    if (parts.length != 3) return id;
+
+    final y = parts[0];
+    final m = parts[1].padLeft(2, '0');
+    final d = parts[2].padLeft(2, '0');
+
+    return "$y-$m-$d";
+  }
+
   /// ✅ Timestamp, Map, List 변환
   dynamic _normalizeValue(dynamic value) {
     if (value is Timestamp) {
@@ -62,10 +74,15 @@ class ScheduleSyncService {
 
       final normalized = _normalizeValue(data);
 
-      debugPrint("📡 Firestore 문서 변경 감지됨 → ${snapshot.id}");
-      debugPrint("🚀 Flask 전송 시도 → ${snapshot.id}, data: $normalized");
+      /// ⭐ 날짜 포맷 적용
+      final formattedId = _formatDateId(snapshot.id);
 
-      NetworkHelper.sendScheduleToFlask(uid, snapshot.id, normalized);
+      debugPrint("📡 Firestore 문서 변경 감지됨 → ${snapshot.id}");
+      debugPrint("🚀 Flask 전송 시도 → $formattedId, data: $normalized");
+
+      /// ⭐ 기존 snapshot.id → formattedId 로 변경
+      NetworkHelper.sendScheduleToFlask(uid, formattedId, normalized);
+
     }, onError: (e) {
       debugPrint("💥 [ScheduleSync] 문서 리스너 오류 (${docRef.id}): $e");
     });
@@ -73,7 +90,7 @@ class ScheduleSyncService {
     _listeners.add(sub);
   }
 
-  /// 🔹 자정 전체 동기화 (백업용)
+  /// 🔹 자정 전체 동기화
   void scheduleDailyFullSync() {
     Timer.periodic(const Duration(hours: 1), (timer) async {
       final now = DateTime.now();
@@ -102,8 +119,15 @@ class ScheduleSyncService {
       try {
         final data = doc.data();
         final normalized = _normalizeValue(data);
-        debugPrint("📤 [ScheduleSync] Full Sync → ${doc.id}");
-        await NetworkHelper.sendScheduleToFlask(uid, doc.id, normalized);
+
+        /// ⭐ 날짜 포맷 적용
+        final formattedId = _formatDateId(doc.id);
+
+        debugPrint("📤 [ScheduleSync] Full Sync → $formattedId");
+
+        /// ⭐ 기존 doc.id → formattedId
+        await NetworkHelper.sendScheduleToFlask(uid, formattedId, normalized);
+
       } catch (e) {
         debugPrint("❌ [ScheduleSync] Full Sync 중 오류: $e");
       }
